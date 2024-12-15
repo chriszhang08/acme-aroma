@@ -160,12 +160,20 @@ print(model_cat.summary())
 print(model_quant.summary())
 print(model_relevant.summary())
 
+#%%
+model_final = sm.logit(formula="Attrition ~ Age_sd + DistanceFromHome_sd + Education + "
+                               "NumCompaniesWorked_sd + PercentSalaryHike_sd + "
+                               "StockOptionLevel + TotalWorkingYears_sd + TrainingTimesLastYear_sd + "
+                               "PerformanceRating_sd + JobInvolvement_sd + EnvironmentSatisfaction_sd + "
+                               "JobSatisfaction_sd + WorkLifeBalance_sd", data=train).fit()
+
 
 #%%
 # Predict the values of the train and test data
-train['pred'] = model_quant.predict(train)
-validate['pred'] = model_quant.predict(validate)
-test['pred'] = model_quant.predict(test)
+train['pred'] = model_final.predict(train)
+validate['pred'] = model_final.predict(validate)
+test['pred'] = model_final.predict(test)
+
 
 #%%
 # Create a confusion matrix
@@ -185,3 +193,110 @@ print ("Confusion Matrix : \n", cm)
 # We also can use sklearn to calculate the overall accuracy of the model.  A flawed, but helpful metric.
 print('Test accuracy = ', accuracy_score(test['Attrition'], prediction))
 
+disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+disp.plot()
+plt.show()
+
+
+#%%
+auc=roc_auc_score(test['Attrition'],y_pred )
+print('AUC: %.2f' % auc)
+fpr, tpr, thresholds = roc_curve(test['Attrition'],  y_pred)
+
+# Create ROC curve
+plt.plot(fpr, tpr, label='ROC curve (area = %.2f)' %auc)
+plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='r', label='Random guess')
+plt.title('ROC curve')
+plt.ylabel('True Positive Rate')
+plt.xlabel('False Positive Rate')
+plt.grid()
+plt.legend()
+plt.show()
+
+#%%
+
+data_ns = data.drop(['BusinessTravel', 'Department', 'JobRole'], axis=1)
+
+#%%
+train_, validate_, test_ = train_validate_test_split(data_ns)
+
+y = train_['Attrition']
+X = train_.drop(['Attrition'], axis=1)
+sm = SMOTE(random_state=42)
+X_sm, y_sm = sm.fit_resample(X, y)
+# Notice that the shape of X before and after rebalancing.
+# The data frame has grown to include more cases of where employee attrition = 1.
+print(f'''Shape of X before SMOTE: {X.shape}
+Shape of X after SMOTE: {X_sm.shape}''')
+y_sm.mean()
+# Remerge the data
+tr_sm_ = pd.concat([y_sm, X_sm], axis=1)
+
+tr_sm_.to_csv(r'assets/train_.csv')
+validate_.to_csv(r'assets/validate_.csv')
+test_.to_csv(r'assets/test_.csv')
+
+#%%
+train_ = pd.read_csv("assets/train_.csv", sep=",")
+validate_ = pd.read_csv("assets/validate_.csv", sep=",")
+test_ = pd.read_csv("assets/test_.csv", sep=",")
+
+#%%
+train_ = train_.drop(['Unnamed: 0'], axis=1)
+test_ = test_.drop(['Unnamed: 0'], axis=1)
+validate_ = validate_.drop(['Unnamed: 0'], axis=1)
+
+#%%
+import statsmodels.formula.api as sm
+model_final_ = sm.logit(formula="Attrition ~ Age + DistanceFromHome + Education + "
+                               "NumCompaniesWorked + PercentSalaryHike + "
+                               "StockOptionLevel + TotalWorkingYears + TrainingTimesLastYear + "
+                               "PerformanceRating + JobInvolvement + EnvironmentSatisfaction + "
+                               "JobSatisfaction + WorkLifeBalance", data=train_).fit()
+
+#%%
+# get the mean value of data_ns
+mean_values = data_ns.mean()
+
+# Calculate the log odds of the mean value
+baseline_log_odds = model_final_.predict(mean_values)
+
+# Exponentiate the log odds to get the baseline odds
+baseline_odds = np.exp(baseline_log_odds)
+
+# Calculate the baseline probability
+baseline_probability = baseline_odds / (1 + baseline_odds)
+
+print(f'Baseline Probability: {baseline_probability}')
+
+#%%
+data_copy = data_ns.copy()
+
+data_copy['MonthlyIncome'] = data_copy['MonthlyIncome'] + 7500
+
+# Calculate the log odds of the mean value
+new_log_odds = model_final_.predict(data_copy.mean())
+
+# Exponentiate the log odds to get the new odds
+new_odds = np.exp(new_log_odds)
+
+# Calculate the new probability
+new_probability = new_odds / (1 + new_odds)
+
+probability_difference = new_probability - baseline_probability
+
+# Estimate the number of employees that will not attrite
+num_employees = 3965  # Replace with actual number of employees at Acme Aroma
+employees_saved = probability_difference * num_employees
+
+# Estimate the cost savings per employee (assume a range of 50-75% of salary)
+average_salary = 65104  # Replace with actual average salary
+cost_savings_min = employees_saved * 0.50 * average_salary
+cost_savings_max = employees_saved * 0.75 * average_salary
+
+# Print results
+print(f"Baseline probability: {baseline_probability[0]:.4f}")
+print(f"New probability after initiative: {new_probability[0]:.4f}")
+print(f"Employees saved due to initiative: {employees_saved[0]:.0f}")
+print(f"Estimated cost savings (50% salary): ${cost_savings_min[0]:.2f}")
+print(f"Estimated cost savings (75% salary): ${cost_savings_max[0]:.2f}")
