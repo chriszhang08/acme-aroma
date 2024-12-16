@@ -249,7 +249,7 @@ validate_ = validate_.drop(['Unnamed: 0'], axis=1)
 #%%
 import statsmodels.formula.api as sm
 model_final_ = sm.logit(formula="Attrition ~ Age + DistanceFromHome + Education + "
-                               "NumCompaniesWorked + PercentSalaryHike + "
+                               "NumCompaniesWorked + PercentSalaryHike + MonthlyIncome + "
                                "StockOptionLevel + TotalWorkingYears + TrainingTimesLastYear + "
                                "PerformanceRating + JobInvolvement + EnvironmentSatisfaction + "
                                "JobSatisfaction + WorkLifeBalance", data=train_).fit()
